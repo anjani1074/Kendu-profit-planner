@@ -1,0 +1,1770 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Kendu Sell Strategy Calculator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        // --- Dark Mode Tailwind Configuration (Kendu Gold/Orange Theme) ---
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        // Base Colors
+                        'kendu-dark-bg': '#000000', // Pure Black Background
+                        'kendu-card-bg': '#1a1a1a', // Very Dark Grey for Card Background definition
+                        
+                        // Kendu Brand Accents
+                        'kendu-primary': '#FF9900', // Bright Orange/Gold for Titles/Accents (Hero Section color)
+                        'kendu-secondary': '#CC7A00', // Darker, richer orange for Buttons/Key Areas
+                        'kenduGold': '#C0A040', // Specific GOLD color for borders
+                        
+                        // Status Colors
+                        'kendu-status-green': '#38E54D', // Vibrant Success Green
+                        'kendu-status-red': '#E53838',   // Vibrant Danger Red
+                        'kendu-success': '#38E54D',      // Realized USD (Green is typically positive)
+                        'kendu-danger': '#E53838',       // Warning Red
+                        'kendu-unrealized': '#b3b3b3', // Light Grey/White for unrealized value
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            background-color: #000000;
+            color: #ffffff;
+        }
+        .container-shadow {
+            box-shadow: 0 0 50px rgba(255, 153, 0, 0.4), 0 0 15px rgba(255, 153, 0, 0.2);
+        }
+        .spinner {
+            border: 4px solid rgba(255,255,255,0.1);
+            border-top: 4px solid #fff;
+            border-radius: 50%;
+            width: 1rem;
+            height: 1rem;
+            animation: spin 1s linear infinite;
+            margin-right: 0.5rem;
+            display: inline-block;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        .high-contrast-input {
+          padding: 1rem;
+          border: 2px solid #C0A040; /* kenduGold */
+          background-color: #ffffff; /* white background */
+          color: #000000; /* black text */
+          border-radius: 0.75rem;
+          box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);
+          transition: all 0.15s ease-in-out;
+          width: 100%;
+        }
+
+        .high-contrast-input:focus {
+          outline: none;
+          border-color: #C0A040;
+          box-shadow: 0 0 0 4px rgba(192,160,64,0.4);
+        }
+
+        .high-contrast-input::placeholder {
+            color: #4B5563;
+            opacity: 1;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        @media (min-width: 640px) {
+            .cumul-text { font-size: 0.75rem; }
+        }
+
+        #input-warning { transition: color 0.5s ease, opacity 0.5s ease; }
+
+        /* Tooltip styling (custom dark theme) */
+        .k-tooltip {
+            position: absolute;
+            top: -0.5rem;
+            left: 50%;
+            transform: translate(-50%, -100%);
+            background: rgba(31, 41, 55, 0.95); /* gray-800/95 */
+            color: #ffffff;
+            padding: 6px 8px;
+            border-radius: 6px;
+            font-size: 12px;
+            white-space: nowrap;
+            box-shadow: 0 6px 18px rgba(0,0,0,0.5);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.18s ease;
+            z-index: 50;
+        }
+        .k-tooltip.visible { opacity: 1; pointer-events: auto; }
+
+        /* small arrow */
+        .k-tooltip::after {
+            content: '';
+            position: absolute;
+            bottom: -6px;
+            left: 50%;
+            transform: translateX(-50%);
+            border-width: 6px 6px 0 6px;
+            border-style: solid;
+            border-color: rgba(31,41,55,0.95) transparent transparent transparent;
+        }
+
+        /* projection box wrapper relative positioning */
+        .proj-value-wrapper { position: relative; display: inline-block; }
+
+        /* small helper for the auto-gen controls */
+        .small-info { font-size: 0.85rem; color: #d1d5db; }
+    </style>
+
+<style>
+/* Smaller font and better padding for Target Mcap and Sell Amt inputs */
+.target-mcap-input input,
+.sell-amt-input input {
+    font-size: 0.75rem !important;
+    padding: 0.2rem 0.3rem !important;
+    height: auto !important;
+}
+/* Responsive alignment for control section */
+#strategyControls input,
+#strategyControls button {
+    flex: 1 1 200px;
+    min-width: 150px;
+}
+@media (max-width: 768px) {
+    #strategyControls {
+        flex-direction: column;
+        align-items: stretch;
+    }
+}
+</style>
+
+
+<!-- Kendu.io visual override: fonts, backgrounds, accents (injected by assistant) -->
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --kendu-accent: #FF9900;
+    --kendu-accent-dark: #CC7A00;
+    --kendu-bg: #000000;
+    --kendu-card: #0f0f0f;
+    --kendu-muted: #9ca3af;
+    --kendu-gold-border: #C0A040;
+  }
+  /* Global font + background */
+  html,body{
+    font-family: "Poppins", Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    background: var(--kendu-bg);
+    color: #ffffff;
+  }
+
+  /* Make the main container feel like the kendu.io hero: wider, subtle glass */
+  .container-shadow {
+    background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+    border-radius: 16px;
+    border: 1px solid rgba(255,153,0,0.06);
+    box-shadow: 0 10px 60px rgba(0,0,0,0.7), 0 2px 12px rgba(192,160,64,0.06);
+  }
+
+  h1, h2, h3 { letter-spacing: 0.02em; }
+  h1.text-3xl { font-weight: 800; font-size: 2.2rem; }
+  h2.text-xl { font-weight: 700; }
+
+  /* Accent treatment */
+  .text-kendu-primary { color: var(--kendu-accent) !important; }
+  .bg-kendu-primary { background: linear-gradient(90deg, var(--kendu-accent), var(--kendu-accent-dark)) !important; color: #000000 !important; }
+  .bg-kendu-card-bg { background: var(--kendu-card) !important; }
+  .border-kendu-primary { border-color: rgba(255,153,0,0.12) !important; }
+
+  /* Inputs: darker, subtle inner glow like kendu.io */
+  .high-contrast-input {
+    background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+    color: #fff;
+    border: 1px solid rgba(255,255,255,0.06);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.02);
+    padding: 0.75rem;
+    border-radius: 0.5rem;
+  }
+  .high-contrast-input::placeholder { color: rgba(255,255,255,0.35); }
+
+  /* Buttons: solid flat style with slight glow */
+  button.bg-kendu-secondary, button.bg-kendu-secondary:hover, button#auto-generate-btn {
+    background: var(--kendu-accent-dark) !important;
+    color: #000 !important;
+    border: none !important;
+    box-shadow: 0 6px 18px rgba(204,122,0,0.12);
+  }
+  button.bg-kendu-secondary:hover { background: var(--kendu-accent) !important; transform: translateY(-1px); }
+
+  /* Small info text and muted descriptions */
+  .small-info { color: var(--kendu-muted) !important; }
+
+  /* Make the result boxes more pronounced */
+  .result-box, #result-box-value, #result-box-pl, #result-box-profit-percent {
+    border-radius: 12px;
+    padding: 1rem;
+  }
+
+  /* Responsive - tighten spacing on mobile like kendu.io */
+  @media (max-width: 640px) {
+    .container-shadow { padding: 16px !important; }
+    h1.text-3xl { font-size: 1.6rem !important; }
+  }
+</style>
+
+</head>
+<body class="font-sans min-h-screen flex items-center justify-center p-4">
+
+    <div class="w-full max-w-2xl bg-kendu-card-bg rounded-xl container-shadow p-6 sm:p-8 border-2 border-kendu-secondary">
+        <h1 class="text-3xl font-extrabold text-kendu-primary mb-1 text-center uppercase tracking-wide">KENDU Strategy Planner</h1>
+        <p class="text-sm text-gray-400 mb-6 text-center">Plan your multi-tiered selling strategy across different market cap targets.</p>
+
+        <div id="market-stats" class="mb-6 p-4 bg-gray-900 rounded-lg border border-gray-800">
+            <h2 class="text-lg font-bold text-kendu-primary mb-3 flex justify-between items-center">
+                Current Market Data
+                <span id="update-status" class="text-xs font-semibold px-2 py-1 rounded-full bg-gray-600 text-black">Loading...</span>
+            </h2>
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-x-4">
+                <div class="py-1 border-b border-gray-800">
+                    <span class="text-gray-400 font-medium text-sm">KENDU Price (USD)</span>
+                    <span id="current-price" class="font-semibold text-white text-lg block">Loading...</span>
+                </div>
+                <div class="py-1 border-b border-gray-800">
+                    <span class="text-gray-400 font-medium text-sm">Market Cap (USD)</span>
+                    <span id="market-cap" class="font-semibold text-white text-lg block">Loading...</span>
+                </div>
+                <div class="py-1">
+                    <span id="circulating-supply-label" class="text-gray-400 font-medium text-sm">Circulating Supply (KENDU)</span>
+                    <span id="circulating-supply-display" class="font-semibold text-white text-lg block">996.75 Billion</span>
+                </div>
+            </div>
+            <p id="last-updated" class="text-xs text-gray-500 mt-2 text-right">Last updated: N/A</p>
+        </div>
+
+        <div class="mb-8">
+            <div class="flex flex-col lg:flex-row lg:items-start lg:gap-8">
+                <div class="w-full lg:w-1/1.0">
+                    <div class="mb-2 p-4 border border-kendu-primary/70 rounded-lg bg-kendu-card-bg shadow-lg shadow-kendu-primary/10">
+                        <h2 class="text-xl font-bold text-gray-200 mb-4 border-b border-gray-700 pb-2">1. Your Portfolio</h2>
+                        
+                        <div class="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-4">
+                            <div>
+                                <label for="kendu-amount" class="block text-sm font-medium text-gray-300 mb-2">Existing Kendu Tokens</label>
+                                <input type="text" id="kendu-amount" placeholder="e.g., 500M or 2B" min="0"
+                                       oninput="handleInput('kendu-amount')"
+                                       class="high-contrast-input text-sm font-extrabold">
+                            </div>
+
+                            <div>
+                                <label for="invested-amount" class="block text-sm font-medium text-gray-300 mb-2">Invested USD Amount ($)</label>
+                                <input type="text" id="invested-amount" placeholder="e.g., 1000 or 5k" min="0"
+                                       oninput="handleInput('invested-amount')"
+                                       class="high-contrast-input text-sm font-extrabold">
+                            </div>
+
+                            <div>
+                                <label for="avg-buy-price" class="block text-sm font-medium text-gray-300 mb-2">Average Buy Price (USD)</label>
+                                <input type="text" id="avg-buy-price" placeholder="e.g., 0.00001" min="0"
+                                       oninput="handleInput('avg-buy-price')"
+                                       class="high-contrast-input text-sm font-extrabold">
+                            </div>
+
+                            <div>
+                                <label for="avg-buy-mcap" class="block text-sm font-medium text-gray-300 mb-2">Avg Buy MCap (USD)</label>
+                                <input type="text" id="avg-buy-mcap" placeholder="$12.3M"
+                                       oninput="handleInput('avg-buy-mcap')"
+                                       class="high-contrast-input text-sm font-extrabold">
+                            </div>
+                        </div>
+
+                        <p id="input-warning" class="text-sm text-gray-400 mt-1 opacity-90">
+                            Please enter only one — either Invested USD Amount or Average Buy Price. The other will auto-calculate based on your tokens.
+                        </p>
+
+                        <div class="flex flex-col sm:flex-row sm:items-stretch sm:gap-4 border-t border-gray-700 pt-4">
+
+                            <div id="result-box-value" class="flex-1 p-3 bg-kendu-primary text-kendu-dark-bg rounded-lg transition duration-300 shadow-xl shadow-kendu-primary/60 mb-4 sm:mb-0">
+                                <h3 class="text-sm font-medium mb-1">Equivalent USD Value (<span id="current-price-label">Current Price</span>):</h3>
+                                <p id="usd-value" class="text-xl font-extrabold">$0.00</p>
+                            </div>
+
+                            <div id="result-box-pl" class="flex-1 p-3 bg-kendu-card-bg rounded-lg transition duration-300 shadow-xl shadow-kendu-secondary/30 border border-gray-700 mb-4 sm:mb-0">
+                                <h3 class="text-sm font-medium mb-1 text-gray-300">Unrealized Profit / Loss:</h3>
+                                <p id="unrealized-pl" class="text-xl font-extrabold text-white">$0.00</p>
+                            </div>
+
+                            <div id="result-box-profit-percent" class="flex-1 p-3 bg-kendu-card-bg rounded-lg transition duration-300 shadow-xl shadow-kendu-secondary/30 border border-gray-700">
+                                <h3 class="text-sm font-medium mb-1 text-gray-300">Unrealized Profit %:</h3>
+                                <p id="unrealized-pl-percent" class="text-xl font-extrabold text-white">0.0%</p>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>        
+
+        <!-- SECTION 2: Target Portfolio Calculator -->
+        <div class="mb-6 p-4 border border-kendu-primary/70 rounded-lg bg-kendu-card-bg shadow-lg shadow-kendu-primary/10">
+            <h2 class="text-xl font-bold text-gray-200 mb-4 border-b border-gray-700 pb-2">2. Target Portfolio Calculator</h2>
+            <p class="text-sm text-gray-400 mb-4">Enter a target market cap and the number of KENDU tokens to estimate values at current and target market caps.</p>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                <div>
+                    <label for="target-mcap" class="block text-sm font-medium text-gray-300 mb-2">Target Market Cap (USD)</label>
+                    <input type="text" id="target-mcap" placeholder="$500M" oninput="handleInput('target-mcap')" onblur="normalizeTargetMcapOnBlur()" class="high-contrast-input text-sm font-extrabold">
+                </div>
+
+                <div>
+                    <label for="target-tokens" class="block text-sm font-medium text-gray-300 mb-2">Targeted Kendu Tokens</label>
+                    <input type="text" id="target-tokens" placeholder="250M" oninput="handleInput('target-tokens')" onblur="normalizeTargetTokensOnBlur()" class="high-contrast-input text-sm font-extrabold">
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="p-3 bg-kendu-primary text-kendu-dark-bg rounded-lg transition duration-300 shadow-xl shadow-kendu-primary/60 proj-value-wrapper">
+                    <h3 class="text-sm font-medium mb-1">Value at Current Market Cap:</h3>
+                    <p id="proj-value-current" class="text-xl font-extrabold">$0.0</p>
+                    <div id="proj-tooltip-current" class="k-tooltip" aria-hidden="true"></div>
+                </div>
+
+                <div class="p-3 bg-kendu-card-bg rounded-lg transition duration-300 shadow-xl shadow-kendu-secondary/30 border border-gray-700 proj-value-wrapper">
+                    <h3 class="text-sm font-medium mb-1 text-gray-300">Value at Target Market Cap:</h3>
+                    <p id="proj-value-target" class="text-xl font-extrabold text-white">$0.0</p>
+                    <div id="proj-tooltip-target" class="k-tooltip" aria-hidden="true"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="mb-6 p-4 border border-kendu-secondary/70 rounded-lg bg-kendu-card-bg shadow-lg shadow-kendu-secondary/10">
+            <h2 class="text-xl font-bold text-gray-200 mb-4 border-b border-gray-700 pb-2">3. Multi-Tier Sell Strategy</h2>
+            
+            <p class="text-sm text-gray-400 mb-4">Define your selling tiers. Calculations are sequential, and percentage sales are based on your **initial** portfolio size.</p>
+
+            <div id="total-sell-warning" class="hidden p-3 mb-4 bg-kendu-danger/20 border-l-4 border-kendu-danger text-sm text-kendu-danger rounded-r-lg font-medium"></div>
+
+            <!-- NEW: Auto-generation controls -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Target USD Realized</label>
+                    <input id="auto-target-usd" class="high-contrast-input text-sm font-extrabold" placeholder="e.g., $10000 or 250k" oninput="handleInput('auto-target-usd')">
+                    <p class="small-info mt-1">Enter the USD you want to realize by selling (use suffixes like K/M/B).</p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Max Mcap Est.</label>
+                    <input id="auto-max-mcap" class="high-contrast-input text-sm font-extrabold" placeholder="$1B" oninput="handleInput('auto-max-mcap')">
+                    <p class="small-info mt-1">Maximum market cap estimate for KENDU (used as top tier).</p>
+                </div>
+                <div class="flex items-end gap-2">
+                    <button id="auto-generate-btn" onclick="autoGenerateStrategy(false)" class="w-full bg-kendu-secondary hover:bg-kendu-primary text-kendu-dark-bg font-semibold py-2 rounded-lg transition duration-150 shadow-md shadow-black/50 border border-kendu-primary/50">
+                        Auto-generate strategy
+                    </button>
+                    <button id="alt-plan-btn" onclick="autoGenerateStrategy(true)" class="w-full bg-gray-800 hover:bg-gray-700 text-white font-semibold py-2 rounded-lg transition duration-150 border border-gray-700">
+                        Generate alternative plan
+                    </button>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-12 gap-2 text-xs font-semibold text-gray-400 mb-2">
+                <div class="col-span-3">Target MCap ($)</div>
+                <div class="col-span-3">Sell Amt</div>
+                <div class="col-span-2 text-center hidden sm:block">Cumul. Sold</div>
+                <div class="col-span-2 text-right hidden sm:block">USD Realized</div>
+                <div class="col-span-2 text-right hidden sm:block">Unrealized Value</div> 
+                <div class="col-span-1"></div>
+            </div>
+
+            <div id="sell-tiers-container" class="space-y-3"></div>
+
+            <div class="flex gap-2 mt-4">
+                <button onclick="addSellTier()" class="flex-1 bg-kendu-secondary hover:bg-kendu-primary text-kendu-dark-bg font-semibold py-2 rounded-lg transition duration-150 shadow-md shadow-black/50 border border-kendu-primary/50">
+                    + Add Sell Tier
+                </button>
+                <button onclick="copyTableCSV()" class="flex-1 bg-gray-800 hover:bg-gray-700 text-white font-semibold py-2 rounded-lg transition duration-150 border border-gray-700">
+                    Copy table (CSV)
+                </button>
+            </div>
+        </div>
+
+        <div class="mt-6 p-5 bg-kendu-card-bg rounded-xl shadow-2xl shadow-kendu-secondary/60 border border-kendu-primary">
+            <h2 class="text-2xl font-extrabold mb-3 text-kendu-primary">Strategy Execution Summary</h2>
+            
+            <div class="flex justify-between items-center py-2 border-t border-gray-700">
+                <h3 class="text-lg font-medium text-gray-300">Total USD Realized:</h3>
+                <p id="total-usd-realized" class="text-xl font-extrabold text-kendu-success">$0.00</p>
+            </div>
+            
+            <div class="flex justify-between items-center py-2 border-t border-gray-700">
+                <h3 class="text-lg font-medium text-gray-300">Total Realized Profit / Loss:</h3>
+                <p id="total-realized-pl" class="text-xl font-extrabold text-white">$0.00</p>
+            </div>
+            
+            <div class="flex justify-between items-center py-2 border-t border-gray-700">
+                <h3 class="text-lg font-medium text-gray-300">KENDU Tokens Remaining:</h3>
+                <p id="final-remaining-kendu" class="text-xl font-extrabold text-white">0</p>
+            </div>
+            
+            <div class="flex justify-between items-center py-2 border-t border-gray-700">
+                <h3 class="text-lg font-medium text-gray-300">Remaining Value (at Final Tier Price):</h3>
+                <p id="remaining-value-at-final-price" class="text-xl font-extrabold text-kendu-unrealized">$0.00</p>
+            </div>
+        </div>
+
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        
+        let app;
+        let auth;
+
+        if (firebaseConfig) {
+            app = initializeApp(firebaseConfig);
+            auth = getAuth(app);
+
+            async function authenticate() {
+                try {
+                    if (initialAuthToken) {
+                        await signInWithCustomToken(auth, initialAuthToken);
+                    } else {
+                        await signInAnonymously(auth);
+                    }
+                } catch (error) {
+                    console.error("Firebase authentication failed:", error);
+                }
+            }
+            authenticate();
+        }
+
+        // API config
+        const KENDU_TOKEN_ADDRESS = '0xaa95f26e30001251fb905d264aa7b00ee9df6c18'; 
+        const API_URL = `https://api.dexscreener.com/latest/dex/tokens/${KENDU_TOKEN_ADDRESS}`;
+        const POLLING_INTERVAL = 120000; // 2 minutes
+
+        const FALLBACK_PRICE_USD = 0.0000115; 
+        const FALLBACK_MARKET_CAP = 11500000; 
+        const KENDU_CIRCULATING_SUPPLY = 996747147258; 
+
+        let KENDU_PRICE_USD = 0;
+        let MARKET_CAP_USD = 0;
+
+        // Utility formatting helpers
+
+        function formatUSD(value, maxDecimals = 10) {
+            let options = {
+                style: 'currency',
+                currency: 'USD',
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+            };
+            if (value !== 0 && Math.abs(value) < 0.01) {
+                options.minimumFractionDigits = 5;
+                options.maximumFractionDigits = maxDecimals;
+            }
+            return new Intl.NumberFormat('en-US', options).format(value);
+        }
+
+        function formatLargeUSD(value) {
+             return new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: 'USD',
+                maximumFractionDigits: 0
+            }).format(value);
+        }
+
+        function formatShortUSD(value) {
+            if (typeof value !== 'number' || !isFinite(value)) return '$0';
+            const abs = Math.abs(value);
+            if (abs >= 1e12) {
+                return `$${(value / 1e12).toFixed(2).replace(/\.00$/, '')}T`;
+            }
+            if (abs >= 1e9) {
+                return `$${(value / 1e9).toFixed(2).replace(/\.00$/, '')}B`;
+            }
+            if (abs >= 1e6) {
+                return `$${(value / 1e6).toFixed(2).replace(/\.00$/, '')}M`;
+            }
+            if (abs >= 1e3) {
+                return `$${(value / 1e3).toFixed(2).replace(/\.00$/, '')}K`;
+            }
+            return `$${Number(value.toFixed(2)).toString()}`;
+        }
+
+        function formatSmartInvestedUSD(value) {
+            if (typeof value !== 'number' || !isFinite(value)) return '$0';
+            const abs = Math.abs(value);
+
+            if (abs < 10000) {
+                let s = value.toFixed(1).replace(/\.0$/, '');
+                return `$${s}`;
+            }
+
+            if (abs >= 1e9) {
+                let s = (value / 1e9).toFixed(1).replace(/\.0$/, '');
+                return `$${s}B`;
+            }
+            if (abs >= 1e6) {
+                let s = (value / 1e6).toFixed(1).replace(/\.0$/, '');
+                return `$${s}M`;
+            }
+            let k = Math.round(value / 1e3);
+            return `$${k}K`;
+        }
+
+        /**
+         * Formats projection USD values for the Target Portfolio Calculator:
+         * - < $10,000 -> one decimal (e.g., $523.4)
+         * - >= $10,000 -> use K/M/B with one decimal (drop trailing .0)
+         * includes commas where appropriate (uses toLocaleString)
+         */
+        function formatProjectionUSD(value) {
+            if (typeof value !== 'number' || !isFinite(value)) return '$0.0';
+            const abs = Math.abs(value);
+
+            if (abs < 10000) {
+                let s = value.toFixed(1).replace(/\.0$/, '');
+                // add commas for values >= 1000 even in this small-range format
+                if (Math.abs(Number(s)) >= 1000) {
+                    return `$${Number(s).toLocaleString('en-US')}`;
+                }
+                return `$${s}`;
+            }
+            if (abs >= 1e9) {
+                let s = (value / 1e9).toFixed(1).replace(/\.0$/, '');
+                // ensure comma separation for integer part if needed (rare for B)
+                const [intPart, dec] = s.split('.');
+                const intFormatted = Number(intPart).toLocaleString('en-US');
+                return dec ? `$${intFormatted}.${dec}B` : `$${intFormatted}B`;
+            }
+            if (abs >= 1e6) {
+                let s = (value / 1e6).toFixed(1).replace(/\.0$/, '');
+                const [intPart, dec] = s.split('.');
+                const intFormatted = Number(intPart).toLocaleString('en-US');
+                return dec ? `$${intFormatted}.${dec}M` : `$${intFormatted}M`;
+            }
+            // thousands
+            let s = (value / 1e3).toFixed(1).replace(/\.0$/, '');
+            const [intPart, dec] = s.split('.');
+            const intFormatted = Number(intPart).toLocaleString('en-US');
+            return dec ? `$${intFormatted}.${dec}K` : `$${intFormatted}K`;
+        }
+
+        function formatTokens(value) {
+            if (value === 0) return '0';
+            const absValue = Math.abs(value);
+            const sign = value < 0 ? '-' : '';
+
+            let formattedNumber;
+            let suffix = '';
+            let scale = 1;
+
+            if (absValue >= 1e12) {
+                scale = 1e12;
+                suffix = 'T';
+            } else if (absValue >= 1e9) {
+                scale = 1e9;
+                suffix = 'B';
+            } else if (absValue >= 1e6) {
+                scale = 1e6;
+                suffix = 'M';
+            } else if (absValue >= 1e3) {
+                scale = 1e3;
+                suffix = 'K';
+            } else {
+                return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(value);
+            }
+            
+            const numberAtScale = absValue / scale;
+            
+            formattedNumber = numberAtScale.toLocaleString('en-US', {
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 2,
+            });
+
+            return sign + formattedNumber + suffix;
+        }
+
+        function parseInputWithSuffixes(inputValue) {
+            let cleanedInput = String(inputValue).replace(/\([^)]*\)/g, '').trim().toUpperCase();
+            if (cleanedInput.length === 0) return 0;
+
+            const suffix = cleanedInput.slice(-1);
+            let numericString = cleanedInput;
+            let multiplier = 1;
+
+            if (suffix === 'M') {
+                multiplier = 1e6;
+                numericString = cleanedInput.slice(0, -1);
+            } else if (suffix === 'B') {
+                multiplier = 1e9;
+                numericString = cleanedInput.slice(0, -1);
+            } else if (suffix === 'T') {
+                multiplier = 1e12;
+                numericString = cleanedInput.slice(0, -1);
+            } else if (suffix === 'K') {
+                multiplier = 1e3;
+                numericString = cleanedInput.slice(0, -1);
+            }
+
+            // Remove $ and commas if present
+            numericString = numericString.replace(/\$/g, '').replace(/,/g, '').trim();
+
+            const numericValue = parseFloat(numericString);
+            if (!isNaN(numericValue) && numericValue >= 0) {
+                return numericValue * multiplier;
+            }
+            return 0;
+        }
+
+        function parseNumericInput(inputValue) {
+            let cleanedInput = String(inputValue || '').trim().toUpperCase();
+            if (cleanedInput.length === 0) return 0;
+
+            cleanedInput = cleanedInput.replace(/\$/g, '').replace(/,/g, '').replace(/\s+/g, '');
+
+            const suffix = cleanedInput.slice(-1);
+            let numericString = cleanedInput;
+            let multiplier = 1;
+
+            if (suffix === 'K') {
+                multiplier = 1e3;
+                numericString = cleanedInput.slice(0, -1);
+            } else if (suffix === 'M') {
+                multiplier = 1e6;
+                numericString = cleanedInput.slice(0, -1);
+            } else if (suffix === 'B') {
+                multiplier = 1e9;
+                numericString = cleanedInput.slice(0, -1);
+            } else if (suffix === 'T') {
+                multiplier = 1e12;
+                numericString = cleanedInput.slice(0, -1);
+            }
+            
+            const numericValue = parseFloat(numericString);
+            if (!isNaN(numericValue) && numericValue >= 0) {
+                return numericValue * multiplier;
+            }
+            return 0;
+        }
+
+        function parseTierSale(inputValue, initialKendu, currentRemainingKendu) {
+            let cleanedInput = String(inputValue).replace(/\([^)]*\)/g, '').trim().toUpperCase();
+            if (cleanedInput.length === 0 || initialKendu <= 0) {
+                return { kenduToSell: 0, intendedAmount: 0, description: '0 KENDU', percentageUsed: false };
+            }
+
+            let intendedAmount = 0;
+            if (cleanedInput.endsWith('%')) {
+                const percentageString = cleanedInput.slice(0, -1);
+                const percentage = parseFloat(percentageString);
+                if (!isNaN(percentage) && percentage >= 0) {
+                    const clampedPercentage = Math.min(100, Math.max(0, percentage));
+                    intendedAmount = initialKendu * (clampedPercentage / 100);
+                    const amount = Math.min(intendedAmount, currentRemainingKendu);
+                    let description = `${clampedPercentage}% of Initial Stack`;
+                    if (amount < intendedAmount) { description += ' (Limited)'; }
+                    return { kenduToSell: amount, intendedAmount: intendedAmount, description: description, percentageUsed: true };
+                }
+            }
+
+            intendedAmount = parseInputWithSuffixes(inputValue);
+            if (intendedAmount > 0) {
+                const finalAmount = Math.min(intendedAmount, currentRemainingKendu);
+                let description = `${formatTokens(intendedAmount)} KENDU`;
+                if (finalAmount < intendedAmount) description += ' (Limited)';
+                return { kenduToSell: finalAmount, intendedAmount: intendedAmount, description: description, percentageUsed: false };
+            }
+
+            return { kenduToSell: 0, intendedAmount: 0, description: 'Invalid Input', percentageUsed: false };
+        }
+
+
+        // --- Core logic and fetch ---
+
+        async function fetchKenduPrice() {
+            const statusElement = document.getElementById('update-status');
+            const priceElement = document.getElementById('current-price');
+            const capElement = document.getElementById('market-cap');
+            const lastUpdatedElement = document.getElementById('last-updated');
+            const priceLabel = document.getElementById('current-price-label');
+
+            statusElement.className = 'text-xs font-semibold px-2 py-1 rounded-full bg-gray-700 text-black flex items-center';
+            statusElement.innerHTML = '<span class="spinner"></span> Updating...';
+            priceElement.textContent = 'Fetching...';
+            capElement.textContent = 'Fetching...';
+            priceLabel.textContent = 'Current Price';
+
+            const maxRetries = 3;
+            const baseDelay = 1000;
+            let success = false;
+
+            for (let attempt = 0; attempt < maxRetries; attempt++) {
+                try {
+                    const response = await fetch(API_URL);
+                    if (!response.ok) throw new Error(`API status: ${response.status}`);
+                    const data = await response.json();
+                    if (data.pairs && data.pairs.length > 0) {
+                        const pair = data.pairs[0];
+                        KENDU_PRICE_USD = parseFloat(pair.priceUsd);
+                        MARKET_CAP_USD = pair.fdv || 0;
+                        if (KENDU_PRICE_USD > 0 && MARKET_CAP_USD > 0) {
+                            success = true;
+                            const lastUpdated = new Date().toLocaleTimeString();
+                            priceElement.textContent = formatUSD(KENDU_PRICE_USD, 6);
+                            capElement.textContent = formatLargeUSD(MARKET_CAP_USD);
+                            lastUpdatedElement.textContent = `Last updated: ${lastUpdated} (Source: Dexscreener - ETH)`;
+                            statusElement.className = 'text-xs font-semibold px-2 py-1 rounded-full bg-kendu-status-green text-black';
+                            statusElement.textContent = 'Live Data';
+                            break;
+                        } else {
+                            throw new Error("Live price or market cap data is zero/invalid.");
+                        }
+                    } else {
+                        throw new Error("Kendu token pair data not found for ETH.");
+                    }
+                } catch (error) {
+                    console.warn(`Attempt ${attempt + 1} failed. (Error: ${error.message}). Retrying...`);
+                    if (attempt < maxRetries - 1) {
+                        const delay = baseDelay * (2 ** attempt) + Math.random() * 500;
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                    }
+                }
+            }
+
+            if (!success) {
+                console.error("Failed to fetch live Kendu price after all retries. Using fallback data.");
+                KENDU_PRICE_USD = FALLBACK_PRICE_USD;
+                MARKET_CAP_USD = FALLBACK_MARKET_CAP;
+                statusElement.className = 'text-xs font-semibold px-2 py-1 rounded-full bg-kendu-status-red text-black';
+                statusElement.textContent = 'Fallback Price';
+                priceLabel.textContent = 'Fallback Price';
+                priceElement.textContent = formatUSD(KENDU_PRICE_USD, 6);
+                capElement.textContent = formatLargeUSD(MARKET_CAP_USD);
+                lastUpdatedElement.textContent = `Using static fallback data (Est. $${MARKET_CAP_USD / 1e6}M)`;
+            }
+
+            recalculateAll();
+        }
+
+        function calculateCurrentValue(kenduAmount) {
+            const resultElement = document.getElementById('usd-value');
+            const usdValue = kenduAmount * KENDU_PRICE_USD;
+            resultElement.textContent = formatUSD(usdValue);
+        }
+
+        function calculateCostBasis(kenduAmount) {
+            const investedAmountInput = document.getElementById('invested-amount').value;
+            const avgPriceInput = document.getElementById('avg-buy-price').value;
+            const unrealizedPLElement = document.getElementById('unrealized-pl');
+            const profitPercentElement = document.getElementById('unrealized-pl-percent');
+
+            const investedAmount = parseNumericInput(investedAmountInput);
+            const avgBuyPrice = parseNumericInput(avgPriceInput);
+            const currentUSDValue = kenduAmount * KENDU_PRICE_USD;
+
+            let costBasis = 0;
+            let profitLoss = 0;
+
+            if (investedAmount > 0) {
+                costBasis = investedAmount;
+            } else if (avgBuyPrice > 0 && kenduAmount > 0) {
+                costBasis = kenduAmount * avgBuyPrice;
+            }
+
+            if (costBasis > 0) {
+                profitLoss = currentUSDValue - costBasis;
+                if (profitLoss > 0) {
+                    unrealizedPLElement.className = 'text-xl font-extrabold text-kendu-success';
+                } else if (profitLoss < 0) {
+                    unrealizedPLElement.className = 'text-xl font-extrabold text-kendu-danger';
+                } else {
+                    unrealizedPLElement.className = 'text-xl font-extrabold text-white';
+                }
+                unrealizedPLElement.textContent = formatUSD(profitLoss);
+
+                const profitPercent = (profitLoss / costBasis) * 100;
+                const profitPercentText = `${profitPercent.toFixed(1)}%`;
+
+                if (profitPercent > 0) {
+                    profitPercentElement.className = 'text-xl font-extrabold text-kendu-success';
+                } else if (profitPercent < 0) {
+                    profitPercentElement.className = 'text-xl font-extrabold text-kendu-danger';
+                } else {
+                    profitPercentElement.className = 'text-xl font-extrabold text-white';
+                }
+                profitPercentElement.textContent = profitPercentText;
+            } else {
+                unrealizedPLElement.textContent = '$0.00';
+                unrealizedPLElement.className = 'text-xl font-extrabold text-white';
+                profitPercentElement.textContent = '0.0%';
+                profitPercentElement.className = 'text-xl font-extrabold text-white';
+            }
+        }
+
+        function formatCalculatedSale(absoluteKenduSold, initialKenduAmount) {
+            if (absoluteKenduSold <= 0 || initialKenduAmount <= 0) return '';
+            const absoluteDisplay = formatTokens(absoluteKenduSold);
+            const percentOfInitial = (absoluteKenduSold / initialKenduAmount) * 100;
+            const roundedPercent = percentOfInitial.toFixed(1).replace(/\.0$/, '');
+            return `${absoluteDisplay} (${roundedPercent}%)`;
+        }
+
+        function calculateTieredStrategy(initialKenduAmount) {
+            const tierRows = document.querySelectorAll('.sell-tier-row');
+            let currentRemainingKendu = initialKenduAmount;
+            let totalUsdRealized = 0;
+            let finalTierPrice = 0;
+            let totalIntendedKenduToSell = 0;
+            let cumulativeKenduSold = 0;
+
+            const investedAmountInput = document.getElementById('invested-amount').value;
+            const avgPriceInput = document.getElementById('avg-buy-price').value;
+            const investedAmount = parseNumericInput(investedAmountInput);
+            const avgBuyPrice = parseNumericInput(avgPriceInput);
+
+            let costBasisPerToken = 0;
+            let totalRealizedCostBasis = 0;
+
+            if (avgBuyPrice > 0) {
+                 costBasisPerToken = avgBuyPrice;
+            } else if (investedAmount > 0 && initialKenduAmount > 0) {
+                 costBasisPerToken = investedAmount / initialKenduAmount;
+            }
+
+            const formatter = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
+
+            tierRows.forEach((row, index) => {
+                const targetCapInput = row.querySelector('.target-cap-input');
+                const sellAmountInput = row.querySelector('.sell-amount-input');
+
+                const cumulativeSoldDisplay = row.querySelector('.tier-cumulative-sold');
+                const targetPriceDisplay = row.querySelector('.tier-target-price');
+                const usdRealizedDisplay = row.querySelector('.tier-usd-realized');
+                const unrealizedValueDisplay = row.querySelector('.tier-unrealized-value');
+                const kenduToSellDisplay = row.querySelector('.tier-kendu-to-sell');
+                const remainingKenduDisplay = row.querySelector('.tier-remaining-kendu');
+
+                cumulativeSoldDisplay.textContent = '-';
+                targetPriceDisplay.textContent = '-';
+                usdRealizedDisplay.textContent = '-';
+                unrealizedValueDisplay.textContent = '-';
+                kenduToSellDisplay.textContent = '-';
+                remainingKenduDisplay.textContent = '-';
+
+                const inputValue = sellAmountInput.value;
+
+                const targetMarketCap = parseInputWithSuffixes(targetCapInput.value);
+                if (targetMarketCap <= 0 || KENDU_CIRCULATING_SUPPLY <= 0) return;
+
+                const tierTargetPrice = targetMarketCap / KENDU_CIRCULATING_SUPPLY;
+                const saleResult = parseTierSale(inputValue, initialKenduAmount, currentRemainingKendu);
+                const kenduToSell = saleResult.kenduToSell;
+                totalIntendedKenduToSell += saleResult.intendedAmount;
+
+                const usdFromSale = kenduToSell * tierTargetPrice;
+
+                if (kenduToSell > 0) {
+                    currentRemainingKendu -= kenduToSell;
+                    totalUsdRealized += usdFromSale;
+                    finalTierPrice = tierTargetPrice;
+                    cumulativeKenduSold += kenduToSell;
+                    if (costBasisPerToken > 0) {
+                        totalRealizedCostBasis += kenduToSell * costBasisPerToken;
+                    }
+                }
+
+                const unrealizedValue = currentRemainingKendu * tierTargetPrice;
+                let cumulativePercentageSold = 0;
+                if (initialKenduAmount > 0) cumulativePercentageSold = (cumulativeKenduSold / initialKenduAmount) * 100;
+
+                targetPriceDisplay.textContent = formatUSD(tierTargetPrice, 6);
+                usdRealizedDisplay.textContent = formatUSD(usdFromSale);
+                unrealizedValueDisplay.textContent = formatUSD(unrealizedValue);
+
+                kenduToSellDisplay.textContent = formatTokens(kenduToSell);
+                remainingKenduDisplay.textContent = formatTokens(currentRemainingKendu);
+
+                if (cumulativeKenduSold > 0) {
+                    const absoluteAmount = formatTokens(cumulativeKenduSold);
+                    const roundedPercent = Math.round(cumulativePercentageSold);
+                    const formattedCumulative = `${absoluteAmount} (${roundedPercent}%)`;
+                    cumulativeSoldDisplay.textContent = formattedCumulative;
+                } else {
+                    cumulativeSoldDisplay.textContent = '-';
+                }
+            });
+
+            const warningElement = document.getElementById('total-sell-warning');
+            if (initialKenduAmount > 0 && totalIntendedKenduToSell > initialKenduAmount * 1.000000001) {
+                const excess = totalIntendedKenduToSell - initialKenduAmount;
+                const excessPercent = (excess / initialKenduAmount) * 100;
+
+                warningElement.innerHTML = `
+                    <span class="font-extrabold">Warning:</span> Your planned sales exceed your initial stack by 
+                    <span class="font-extrabold">${excessPercent.toFixed(1)}%</span> (${formatTokens(excess)} KENDU).
+                    <br>
+                    <span class="font-normal text-xs">The calculation below correctly caps sales at your remaining balance for each tier.</span>
+                `;
+                warningElement.classList.remove('hidden');
+            } else {
+                warningElement.classList.add('hidden');
+            }
+
+            const totalRealizedPL = totalUsdRealized - totalRealizedCostBasis;
+            const finalRemainingValue = currentRemainingKendu * finalTierPrice;
+            const realizedPLElement = document.getElementById('total-realized-pl');
+
+            document.getElementById('total-usd-realized').textContent = formatSmartInvestedUSD(totalUsdRealized);
+            document.getElementById('final-remaining-kendu').textContent = formatter.format(currentRemainingKendu);
+            document.getElementById('remaining-value-at-final-price').textContent = formatSmartInvestedUSD(finalRemainingValue);
+
+            realizedPLElement.textContent = formatSmartInvestedUSD(totalRealizedPL);
+            if (totalRealizedPL > 0) {
+                realizedPLElement.className = 'text-xl font-extrabold text-kendu-success';
+            } else if (totalRealizedPL < 0) {
+                realizedPLElement.className = 'text-xl font-extrabold text-kendu-danger';
+            } else {
+                realizedPLElement.className = 'text-xl font-extrabold text-white';
+            }
+        }
+
+        function formatSellAmount(inputElement) {
+            const initialKenduAmount = parseInputWithSuffixes(document.getElementById('kendu-amount').value);
+            if (initialKenduAmount === 0 || inputElement.value.trim() === '') return;
+
+            const tierRows = document.querySelectorAll('.sell-tier-row');
+            let tempRemainingKendu = initialKenduAmount;
+            let actualKenduSoldForThisTier = 0;
+
+            tierRows.forEach(row => {
+                const sellInput = row.querySelector('.sell-amount-input');
+                const isCurrentInput = (sellInput === inputElement);
+                const saleResult = parseTierSale(sellInput.value, initialKenduAmount, tempRemainingKendu);
+                if (isCurrentInput) actualKenduSoldForThisTier = saleResult.kenduToSell;
+                tempRemainingKendu -= saleResult.kenduToSell;
+            });
+
+            if (actualKenduSoldForThisTier > 0) {
+                 const formattedSale = formatCalculatedSale(actualKenduSoldForThisTier, initialKenduAmount);
+                 inputElement.value = formattedSale;
+            } else if (inputElement.value.trim().length > 0) {
+                 inputElement.value = '0 (0.0%)';
+            }
+        }
+
+        // --- Portfolio auto-calc control ---
+        let lastEditedField = null;
+        let programmaticUpdate = false;
+
+        function handleInput(fieldId) {
+            if (programmaticUpdate) return;
+            lastEditedField = fieldId;
+            recalculateAll();
+        }
+
+        // --- New: normalization functions for target inputs (on blur) ---
+        function normalizeTargetMcapOnBlur() {
+            try {
+                const el = document.getElementById('target-mcap');
+                const raw = el.value || '';
+                const numeric = parseNumericInput(raw);
+                if (numeric > 0) {
+                    programmaticUpdate = true;
+                    el.value = formatShortUSD(numeric);
+                    setTimeout(() => { programmaticUpdate = false; }, 0);
+                } else {
+                    // clear if invalid
+                    programmaticUpdate = true;
+                    el.value = '';
+                    setTimeout(() => { programmaticUpdate = false; }, 0);
+                }
+            } catch (e) {
+                console.warn('normalizeTargetMcapOnBlur failed', e);
+            }
+        }
+
+        function normalizeTargetTokensOnBlur() {
+            try {
+                const el = document.getElementById('target-tokens');
+                const raw = el.value || '';
+                const numeric = parseInputWithSuffixes(raw);
+                if (numeric > 0) {
+                    programmaticUpdate = true;
+                    // show as tokens with suffix (no $)
+                    el.value = formatTokens(numeric);
+                    setTimeout(() => { programmaticUpdate = false; }, 0);
+                } else {
+                    programmaticUpdate = true;
+                    el.value = '';
+                    setTimeout(() => { programmaticUpdate = false; }, 0);
+                }
+            } catch (e) {
+                console.warn('normalizeTargetTokensOnBlur failed', e);
+            }
+        }
+
+        /**
+         * Recalculate all derived values and projections
+         */
+        function recalculateAll() {
+             const amountInputElement = document.getElementById('kendu-amount');
+             const initialKenduAmount = parseInputWithSuffixes(amountInputElement.value);
+
+             const investedInputEl = document.getElementById('invested-amount');
+             const avgInputEl = document.getElementById('avg-buy-price');
+             const avgMcapEl = document.getElementById('avg-buy-mcap');
+             const inputWarningEl = document.getElementById('input-warning');
+
+             const rawInvested = investedInputEl.value;
+             const rawAvg = avgInputEl.value;
+             const rawAvgMcap = avgMcapEl.value;
+
+             let investedVal = parseNumericInput(rawInvested);
+             let avgVal = parseNumericInput(rawAvg);
+
+             let avgMcapVal = 0;
+             if (rawAvgMcap && rawAvgMcap.trim() !== '') {
+                 const cleaned = rawAvgMcap.replace(/\$/g, '').replace(/,/g, '').trim().toUpperCase();
+                 avgMcapVal = parseNumericInput(cleaned);
+             }
+
+             if (initialKenduAmount > 0) {
+                 if (lastEditedField === 'avg-buy-mcap') {
+                     if (avgMcapVal > 0) {
+                         const computedAvgPrice = avgMcapVal / KENDU_CIRCULATING_SUPPLY;
+                         const computedInvested = computedAvgPrice * initialKenduAmount;
+
+                         programmaticUpdate = true;
+                         avgInputEl.value = Number(computedAvgPrice.toPrecision(6)).toString();
+                         investedInputEl.value = formatSmartInvestedUSD(computedInvested);
+                         avgMcapEl.value = formatShortUSD(avgMcapVal);
+                         setTimeout(() => { programmaticUpdate = false; }, 0);
+
+                         avgVal = computedAvgPrice;
+                         investedVal = computedInvested;
+                     } else {
+                         programmaticUpdate = true;
+                         avgInputEl.value = '';
+                         investedInputEl.value = '';
+                         setTimeout(() => { programmaticUpdate = false; }, 0);
+                         avgVal = 0;
+                         investedVal = 0;
+                     }
+                 } else if (lastEditedField === 'invested-amount') {
+                     if (investedVal > 0) {
+                         const computedAvg = investedVal / initialKenduAmount;
+                         programmaticUpdate = true;
+                         avgInputEl.value = Number(computedAvg.toPrecision(6)).toString();
+                         setTimeout(() => { programmaticUpdate = false; }, 0);
+                         avgVal = computedAvg;
+                     } else {
+                         programmaticUpdate = true;
+                         avgInputEl.value = '';
+                         setTimeout(() => { programmaticUpdate = false; }, 0);
+                         avgVal = 0;
+                     }
+                 } else if (lastEditedField === 'avg-buy-price') {
+                     if (avgVal > 0) {
+                         const computedInvested = initialKenduAmount * avgVal;
+                         programmaticUpdate = true;
+                         investedInputEl.value = formatSmartInvestedUSD(computedInvested);
+                         setTimeout(() => { programmaticUpdate = false; }, 0);
+                         investedVal = computedInvested;
+                     } else {
+                         programmaticUpdate = true;
+                         investedInputEl.value = '';
+                         setTimeout(() => { programmaticUpdate = false; }, 0);
+                         investedVal = 0;
+                     }
+                 } else if (lastEditedField === 'kendu-amount') {
+                     if (avgVal > 0 && (!investedVal || investedVal === 0)) {
+                         const computedInvested = initialKenduAmount * avgVal;
+                         programmaticUpdate = true;
+                         investedInputEl.value = formatSmartInvestedUSD(computedInvested);
+                         setTimeout(() => { programmaticUpdate = false; }, 0);
+                         investedVal = computedInvested;
+                     } else if (investedVal > 0 && (!avgVal || avgVal === 0)) {
+                         const computedAvg = investedVal / initialKenduAmount;
+                         programmaticUpdate = true;
+                         avgInputEl.value = Number(computedAvg.toPrecision(6)).toString();
+                         setTimeout(() => { programmaticUpdate = false; }, 0);
+                         avgVal = computedAvg;
+                     }
+                 } else {
+                     if (avgVal > 0 && (!investedVal || investedVal === 0)) {
+                         const computedInvested = initialKenduAmount * avgVal;
+                         programmaticUpdate = true;
+                         investedInputEl.value = formatSmartInvestedUSD(computedInvested);
+                         setTimeout(() => { programmaticUpdate = false; }, 0);
+                         investedVal = computedInvested;
+                     } else if (investedVal > 0 && (!avgVal || avgVal === 0)) {
+                         const computedAvg = investedVal / initialKenduAmount;
+                         programmaticUpdate = true;
+                         avgInputEl.value = Number(computedAvg.toPrecision(6)).toString();
+                         setTimeout(() => { programmaticUpdate = false; }, 0);
+                         avgVal = computedAvg;
+                     }
+                 }
+             }
+
+             (function updateInputWarning() {
+                 const investedPresent = investedVal > 0;
+                 const avgPresent = avgVal > 0;
+
+                 if (investedPresent && avgPresent) {
+                     inputWarningEl.textContent = "Both fields entered — last edited value is being used to auto-calculate the other.";
+                     inputWarningEl.className = "text-sm mt-1 text-red-400 opacity-100";
+                 } else if (!investedPresent && !avgPresent) {
+                     inputWarningEl.textContent = "Enter one to calculate portfolio metrics.";
+                     inputWarningEl.className = "text-sm mt-1 text-gray-500 opacity-60";
+                 } else {
+                     inputWarningEl.textContent = "Please enter only one — either Invested USD Amount or Average Buy Price. The other will auto-calculate based on your tokens.";
+                     inputWarningEl.className = "text-sm mt-1 text-gray-400 opacity-90";
+                 }
+             })();
+
+             try {
+                 const avgMcapElLocal = avgMcapEl;
+                 if (avgVal > 0 && avgMcapElLocal) {
+                     if (lastEditedField !== 'avg-buy-mcap') {
+                         const avgBuyMCap = avgVal * KENDU_CIRCULATING_SUPPLY;
+                         programmaticUpdate = true;
+                         avgMcapElLocal.value = formatShortUSD(avgBuyMCap);
+                         setTimeout(() => { programmaticUpdate = false; }, 0);
+                     } else {
+                         if (avgMcapVal > 0) {
+                             programmaticUpdate = true;
+                             avgMcapElLocal.value = formatShortUSD(avgMcapVal);
+                             setTimeout(() => { programmaticUpdate = false; }, 0);
+                         }
+                     }
+                 } else if (avgMcapElLocal) {
+                     if (lastEditedField === 'avg-buy-mcap' && avgMcapVal > 0) {
+                         programmaticUpdate = true;
+                         avgMcapElLocal.value = formatShortUSD(avgMcapVal);
+                         setTimeout(() => { programmaticUpdate = false; }, 0);
+                     } else if (lastEditedField !== 'avg-buy-mcap') {
+                         programmaticUpdate = true;
+                         avgMcapElLocal.value = '';
+                         setTimeout(() => { programmaticUpdate = false; }, 0);
+                     }
+                 }
+             } catch (e) {
+                 console.warn('Avg MCap calc failed:', e);
+             }
+
+            // --- SECTION: Target Portfolio Calculator live projections ---
+            try {
+                const targetMcapVal = parseNumericInput(document.getElementById('target-mcap').value || '');
+                const targetTokensVal = parseInputWithSuffixes(document.getElementById('target-tokens').value || '');
+                let projCurrent = 0;
+                let projTarget = 0;
+                if (targetTokensVal > 0) {
+                    projCurrent = targetTokensVal * KENDU_PRICE_USD;
+                    if (targetMcapVal > 0) {
+                        const targetPrice = targetMcapVal / KENDU_CIRCULATING_SUPPLY;
+                        projTarget = targetTokensVal * targetPrice;
+                    } else {
+                        projTarget = 0;
+                    }
+                }
+                const projCurrentEl = document.getElementById('proj-value-current');
+                const projTargetEl = document.getElementById('proj-value-target');
+                const projTooltipCurrent = document.getElementById('proj-tooltip-current');
+                const projTooltipTarget = document.getElementById('proj-tooltip-target');
+
+                if (projCurrentEl) projCurrentEl.textContent = formatProjectionUSD(projCurrent);
+                if (projTargetEl) projTargetEl.textContent = formatProjectionUSD(projTarget);
+
+                // update tooltip contents (exact numeric with commas and two decimals)
+                if (projTooltipCurrent) {
+                    projTooltipCurrent.textContent = formatUSD(projCurrent, 2);
+                    projTooltipCurrent.setAttribute('aria-hidden', projCurrent === 0 ? 'true' : 'false');
+                }
+                if (projTooltipTarget) {
+                    projTooltipTarget.textContent = formatUSD(projTarget, 2);
+                    projTooltipTarget.setAttribute('aria-hidden', projTarget === 0 ? 'true' : 'false');
+                }
+
+                // Attach hover listeners (only once) - safe to reattach since we check for existing handlers
+                attachTooltipHandlers();
+            } catch (e) {
+                console.warn('Projection calc failed', e);
+            }
+
+             calculateCurrentValue(initialKenduAmount);
+             calculateCostBasis(initialKenduAmount);
+             calculateTieredStrategy(initialKenduAmount); 
+        }
+
+        // Tooltip handler attach (ensure only once)
+        let _tooltipsAttached = false;
+        function attachTooltipHandlers() {
+            if (_tooltipsAttached) return;
+            _tooltipsAttached = true;
+
+            const currentWrapper = document.getElementById('proj-value-current')?.parentElement;
+            const targetWrapper = document.getElementById('proj-value-target')?.parentElement;
+            const currentTooltip = document.getElementById('proj-tooltip-current');
+            const targetTooltip = document.getElementById('proj-tooltip-target');
+
+            if (currentWrapper && currentTooltip) {
+                currentWrapper.addEventListener('mouseenter', () => {
+                    if (currentTooltip.getAttribute('aria-hidden') === 'true') return;
+                    currentTooltip.classList.add('visible');
+                });
+                currentWrapper.addEventListener('mouseleave', () => currentTooltip.classList.remove('visible'));
+                // mobile: show on touchstart and hide after short delay or touchend
+                currentWrapper.addEventListener('touchstart', (e) => {
+                    if (currentTooltip.getAttribute('aria-hidden') === 'true') return;
+                    currentTooltip.classList.add('visible');
+                    setTimeout(() => currentTooltip.classList.remove('visible'), 2500);
+                }, {passive:true});
+            }
+
+            if (targetWrapper && targetTooltip) {
+                targetWrapper.addEventListener('mouseenter', () => {
+                    if (targetTooltip.getAttribute('aria-hidden') === 'true') return;
+                    targetTooltip.classList.add('visible');
+                });
+                targetWrapper.addEventListener('mouseleave', () => targetTooltip.classList.remove('visible'));
+                targetWrapper.addEventListener('touchstart', (e) => {
+                    if (targetTooltip.getAttribute('aria-hidden') === 'true') return;
+                    targetTooltip.classList.add('visible');
+                    setTimeout(() => targetTooltip.classList.remove('visible'), 2500);
+                }, {passive:true});
+            }
+        }
+
+        function addSellTier(prefillTargetMcap = '', prefillSell = '') {
+            const container = document.getElementById('sell-tiers-container');
+            const row = document.createElement('div');
+            row.className = 'sell-tier-row grid grid-cols-12 gap-2 items-start bg-gray-900 p-3 rounded-lg border border-gray-800 shadow-md';
+
+            row.innerHTML = `
+                <div class="col-span-2">
+                    <input type="text" placeholder="e.g., 500M" class="target-cap-input high-contrast-input text-base font-semibold" oninput="recalculateAll()">
+                </div>
+
+                <div class="col-span-3 space-y-1">
+                    <input type="text" placeholder="e.g., 10%, 500M" 
+                           class="sell-amount-input high-contrast-input text-base font-semibold" 
+                           oninput="recalculateAll()"
+                           onblur="formatSellAmount(this)">
+                </div>
+                
+                <div class="hidden sm:block sm:col-span-2 text-center text-sm font-bold text-kendu-primary pt-2 cumul-text">
+                    <span class="tier-cumulative-sold">-</span>
+                </div>
+                
+                <div class="hidden sm:block sm:col-span-2 text-right text-sm font-bold text-kendu-success pt-2">
+                    <span class="tier-usd-realized">-</span>
+                </div>
+
+                <div class="hidden sm:block sm:col-span-2 text-right text-sm font-bold text-kendu-unrealized pt-2">
+                    <span class="tier-unrealized-value">-</span>
+                </div>
+
+                <div class="col-span-1 text-center flex items-center justify-end space-x-2 mt-2 sm:mt-0">
+                    <div class="text-xs text-gray-400 font-medium sm:hidden">Remaining: <span class="tier-remaining-kendu font-bold text-kendu-primary">-</span></div>
+                    <button onclick="removeSellTier(this)" class="p-2 text-kendu-danger hover:text-red-500 transition duration-150">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
+                        </svg>
+                    </button>
+                </div>
+                
+                <div class="col-span-12 sm:hidden text-xs text-gray-500 border-t border-gray-700 pt-2 mt-1 space-y-1">
+                    <div class="flex justify-between">
+                        <span class="font-medium">Tokens to Sell:</span>
+                        <span class="tier-kendu-to-sell font-bold text-white">-</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="font-medium">Cumulative Sold:</span>
+                        <span class="tier-cumulative-sold font-bold text-kendu-primary">-</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="font-medium">Target Price:</span>
+                        <span class="tier-target-price text-white">-</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="font-medium">Realized USD:</span>
+                        <span class="tier-usd-realized font-bold text-kendu-success">-</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="font-medium">Unrealized Value:</span>
+                        <span class="tier-unrealized-value font-bold text-kendu-unrealized">-</span>
+                    </div>
+                </div>
+            `;
+            container.appendChild(row);
+
+            // prefill if provided
+            if (prefillTargetMcap) {
+                const t = row.querySelector('.target-cap-input');
+                t.value = prefillTargetMcap;
+            }
+            if (prefillSell) {
+                const s = row.querySelector('.sell-amount-input');
+                s.value = prefillSell;
+            }
+
+            recalculateAll();
+            row.querySelector('.target-cap-input').focus();
+        }
+
+        function removeSellTier(button) {
+            const row = button.closest('.sell-tier-row');
+            if (row) {
+                row.remove();
+                recalculateAll();
+            }
+        }
+
+        // --- NEW: Auto-generate sell strategy logic (wide randomness + dynamic tiers) --- //
+        // Rules enforced:
+        // 1. Use at least 5 tiers and maximum 10 tiers (tries random order among 5..10)
+        // 2. Sell amount in each tier must be minimum 10% of Existing kendu tokens
+        // 3. Minimum of $100M difference in Target Mcap between each tier
+        // 4. Target Mcap increasing order
+        // 5. If target can't be met with 5..10 tiers -> warn and ask to suggest 3 or 4 tier plan
+        // 6. After generating, option to create dynamic alternative plans (each click generates a new random plan)
+        //
+        // Implementation notes:
+        // - For each candidate tier-count we run multiple random trials (wide randomness).
+        // - Percent distribution is generated via a Dirichlet-like randomization with a floor of 10% per tier.
+        // - Targets are jittered from a baseline linear or geometric spacing so alternatives vary.
+        // - We also cap any one tier's percentage to avoid dumping > 60% in one tier (keeps plans realistic).
+        // - The search order of tier-counts is randomized so alternative clicks often return different counts.
+
+        const MIN_TIERS = 5;
+        const MAX_TIERS = 10;
+        const MIN_DIFF_MCAP = 100_000_000; // $100M
+        const MIN_PERCENT_PER_TIER = 10; // percent of initial stack
+        const MAX_PERCENT_PER_TIER = 60; // don't dump more than 60% in a single tier (keeps realistic)
+        const RANDOM_TRIALS_PER_N = 80; // number of random attempts per tier-count (wide randomness)
+
+        function formatMcapInputForField(valNum) {
+            if (!valNum || isNaN(valNum) || valNum <= 0) return '';
+            return formatShortUSD(valNum);
+        }
+
+        function clearAllTiers() {
+            const container = document.getElementById('sell-tiers-container');
+            container.innerHTML = '';
+        }
+
+        function buildTierTargetsLinear(maxMcapNum, currentMcapNum, nTiers, alternative=false) {
+            // Compute a start value such that step >= MIN_DIFF_MCAP and increasing order, and last tier = maxMcapNum
+            // If alternative === true, use geometric spacing (more weight to higher tiers)
+            const result = [];
+            if (maxMcapNum <= 0) return result;
+
+            // Ensure start is at least current + MIN_DIFF_MCAP
+            let end = Math.max(maxMcapNum, currentMcapNum + MIN_DIFF_MCAP);
+            // Compute minimal possible start so that step >= MIN_DIFF_MCAP: start = end - (n-1)*MIN_DIFF_MCAP
+            let start = end - (nTiers - 1) * MIN_DIFF_MCAP;
+            if (start < currentMcapNum + MIN_DIFF_MCAP) {
+                start = Math.max(currentMcapNum + MIN_DIFF_MCAP, start);
+            }
+
+            // now compute spacing
+            if (!alternative) {
+                const step = (end - start) / Math.max(1, (nTiers - 1));
+                if (step < MIN_DIFF_MCAP) {
+                    // can't meet minimum diff
+                    return [];
+                }
+                for (let i = 0; i < nTiers; i++) {
+                    result.push(Math.round((start + step * i)));
+                }
+            } else {
+                // alternative: geometric/exponential spacing biased to upper tiers
+                // We'll create ratios and map them to [start, end]
+                // Use exponential parameter
+                const a = 1.4; // control skew (1 = linear, >1 skew to high end)
+                const denom = Array.from({length: nTiers}, (_, i) => Math.pow(a, i)).reduce((s,x)=>s+x,0);
+                const ratios = Array.from({length: nTiers}, (_, i) => Math.pow(a, i)/denom);
+                // cumulative
+                let cum = 0;
+                for (let i = 0; i < nTiers; i++) {
+                    cum += ratios[i];
+                    const val = start + cum * (end - start);
+                    result.push(Math.round(val));
+                }
+                // Ensure increasing and minimum diff
+                for (let i = 1; i < result.length; i++) {
+                    if (result[i] - result[i-1] < MIN_DIFF_MCAP) {
+                        result[i] = result[i-1] + MIN_DIFF_MCAP;
+                    }
+                }
+                // Finally cap last to end
+                result[result.length-1] = end;
+            }
+            // ensure strictly increasing and diffs >= MIN_DIFF_MCAP
+            for (let i = 1; i < result.length; i++) {
+                if (result[i] <= result[i-1]) result[i] = result[i-1] + MIN_DIFF_MCAP;
+            }
+            return result;
+        }
+
+        // Helper: returns an array of n percentages (sum to 100) with each >= MIN_PERCENT_PER_TIER and <= MAX_PERCENT_PER_TIER,
+        // uses a Dirichlet-like random distribution for wide randomness.
+        function generateRandomPercentages(n) {
+            const base = MIN_PERCENT_PER_TIER;
+            const remaining = Math.max(0, 100 - base * n);
+            // generate random weights
+            const weights = Array.from({length: n}, () => Math.random() + 0.0001);
+            const weightSum = weights.reduce((s, x) => s + x, 0);
+            const allocations = weights.map(w => (w / weightSum) * remaining);
+            // combine with base and enforce max cap
+            let percents = allocations.map(a => base + a);
+            // enforce max cap and redistribute any overflow
+            let overflow = 0;
+            for (let i = 0; i < n; i++) {
+                if (percents[i] > MAX_PERCENT_PER_TIER) {
+                    overflow += percents[i] - MAX_PERCENT_PER_TIER;
+                    percents[i] = MAX_PERCENT_PER_TIER;
+                }
+            }
+            if (overflow > 0) {
+                // redistribute overflow to tiers that are under max
+                const underIndices = percents.map((p, idx) => ({p, idx})).filter(o => o.p < MAX_PERCENT_PER_TIER).map(o => o.idx);
+                let iter = 0;
+                while (overflow > 0 && underIndices.length > 0 && iter < 20) {
+                    const share = overflow / underIndices.length;
+                    let newOverflow = 0;
+                    for (const idx of underIndices) {
+                        const space = MAX_PERCENT_PER_TIER - percents[idx];
+                        const add = Math.min(space, share);
+                        percents[idx] += add;
+                        newOverflow += (share - add);
+                    }
+                    overflow = newOverflow;
+                    iter++;
+                    if (newOverflow <= 0) break;
+                }
+            }
+            // final normalization to sum to <= 100 (floating issues)
+            const sum = percents.reduce((s, x) => s + x, 0);
+            if (sum !== 100) {
+                const ratio = 100 / sum;
+                percents = percents.map(p => p * ratio);
+            }
+            return percents;
+        }
+
+        // Helper: jitter the baseline targets so we get different spacing but maintain increasing order and min diff
+        function jitterTargets(baseTargets, maxJitterFraction = 0.2, alternativeBias = false) {
+            if (!baseTargets || baseTargets.length === 0) return baseTargets;
+            const n = baseTargets.length;
+            // jitter each target by random factor in [-maxJitterFraction, +maxJitterFraction]
+            let jittered = baseTargets.map((t, i) => {
+                // bias jitter towards larger values if alternativeBias true
+                const sign = (Math.random() - 0.5) * 2;
+                const frac = (Math.random() * maxJitterFraction) * (alternativeBias ? (0.5 + Math.random()) : 1);
+                const factor = 1 + sign * frac;
+                return Math.round(Math.max(t * 0.5, t * factor)); // prevent too small
+            });
+            // ensure increasing and min diff
+            for (let i = 1; i < n; i++) {
+                if (jittered[i] - jittered[i-1] < MIN_DIFF_MCAP) {
+                    jittered[i] = jittered[i-1] + MIN_DIFF_MCAP;
+                }
+            }
+            return jittered;
+        }
+
+        function autoGenerateStrategy(alternative=false) {
+            // read inputs
+            const initialKendu = parseInputWithSuffixes(document.getElementById('kendu-amount').value || '');
+            if (initialKendu <= 0) {
+                alert('Enter your Existing Kendu Tokens (e.g., 500M) before generating the strategy.');
+                return;
+            }
+            const targetUsd = parseNumericInput(document.getElementById('auto-target-usd').value || '');
+            if (targetUsd <= 0) {
+                alert('Enter a Target USD Realized (e.g., 10000 or 1M).');
+                return;
+            }
+            const maxMcapNum = parseNumericInput(document.getElementById('auto-max-mcap').value || '');
+            if (maxMcapNum <= 0) {
+                alert('Enter Max Mcap Est. (e.g., 1B) to use as the top tier target.');
+                return;
+            }
+            const currentMcapNum = MARKET_CAP_USD || 0;
+
+            // Candidate tier counts in random order (so results vary)
+            const possibleNs = [];
+            for (let n = MIN_TIERS; n <= MAX_TIERS; n++) possibleNs.push(n);
+            // shuffle order
+            for (let i = possibleNs.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [possibleNs[i], possibleNs[j]] = [possibleNs[j], possibleNs[i]];
+            }
+
+            let successfulPlan = null;
+
+            // Try each candidate n with many randomized trials (wide randomness)
+            for (const n of possibleNs) {
+                // build baseline targets (try both linear and alternative spacing)
+                let baseTargets = buildTierTargetsLinear(maxMcapNum, currentMcapNum, n, alternative);
+                if (!baseTargets || baseTargets.length !== n) {
+                    // cannot build targets for this n (min diff constraint), skip
+                    continue;
+                }
+
+                // perform many randomized trials to find a feasible realistic allocation
+                for (let trial = 0; trial < RANDOM_TRIALS_PER_N; trial++) {
+                    // generate randomized percentages
+                    const percents = generateRandomPercentages(n);
+                    // convert to token counts
+                    const tokensPerTier = percents.map(p => (p / 100) * initialKendu);
+
+                    // compute jittered targets for this trial to vary spacing
+                    const jitteredTargets = jitterTargets(baseTargets, 0.25, alternative);
+                    // ensure last target never exceeds declared max (defensive)
+                    jitteredTargets[jitteredTargets.length - 1] = Math.min(jitteredTargets[jitteredTargets.length - 1], maxMcapNum);
+
+                    // compute tier prices (price = targetMcap / supply)
+                    const prices = jitteredTargets.map(t => t / KENDU_CIRCULATING_SUPPLY);
+
+                    // compute realized USD
+                    let realizedUsd = 0;
+                    for (let i = 0; i < n; i++) {
+                        realizedUsd += tokensPerTier[i] * prices[i];
+                    }
+
+                    // If realizedUsd meets or slightly exceeds target, accept
+                    if (realizedUsd + 1e-6 >= targetUsd) {
+                        // additional realism check: avoid extreme concentration in last tier
+                        const maxPct = Math.max(...percents);
+                        // Avoid cases where one tier > MAX_PERCENT_PER_TIER (already enforced), and ensure not all early tiers are minimal
+                        const minCount = percents.filter(p => p <= (MIN_PERCENT_PER_TIER + 0.001)).length;
+                        // require at least some variation (not all the first many tiers being exactly min)
+                        if (maxPct <= MAX_PERCENT_PER_TIER && minCount < n - 1) {
+                            successfulPlan = {
+                                n,
+                                targets: jitteredTargets,
+                                prices,
+                                finalTokens: tokensPerTier,
+                                percents
+                            };
+                            break;
+                        }
+                        // else keep searching trials
+                    }
+
+                    // if not meeting target, attempt to top-up allocation intelligently:
+                    // Greedy allocate leftover tokens to higher-price tiers (but respecting MAX_PERCENT_PER_TIER)
+                    let currentRealized = realizedUsd;
+                    let tokens = tokensPerTier.slice();
+                    const indicesByPriceDesc = prices.map((p,i) => ({p,i})).sort((a,b) => b.p - a.p).map(x => x.i);
+                    let tokensLeftTotal = initialKendu - tokens.reduce((s,v)=>s+v,0);
+                    // allocate upto tokensLeftTotal
+                    for (const idx of indicesByPriceDesc) {
+                        if (tokensLeftTotal <= 0) break;
+                        const currentPct = percents[idx];
+                        const maxAllowedPct = Math.min(MAX_PERCENT_PER_TIER, 100 - (percents.reduce((s,x,i)=>i===idx?s:x + (i===idx?0:0),0)));
+                        // compute available pct room for this tier (respect MAX_PERCENT_PER_TIER)
+                        const availablePct = Math.max(0, MAX_PERCENT_PER_TIER - currentPct);
+                        // convert available pct to tokens
+                        const availableTokens = (availablePct / 100) * initialKendu;
+                        const allocate = Math.min(availableTokens, tokensLeftTotal);
+                        if (allocate <= 0) continue;
+                        tokens[idx] += allocate;
+                        tokensLeftTotal -= allocate;
+                        currentRealized += allocate * prices[idx];
+                        // stop early if we've reached target
+                        if (currentRealized + 1e-6 >= targetUsd) break;
+                    }
+
+                    if (currentRealized + 1e-6 >= targetUsd) {
+                        // construct percents from tokens now
+                        const finalPercents = tokens.map(t => (t / initialKendu) * 100);
+                        const maxFinalPct = Math.max(...finalPercents);
+                        const minCountFinal = finalPercents.filter(p => p <= (MIN_PERCENT_PER_TIER + 0.001)).length;
+                        if (maxFinalPct <= MAX_PERCENT_PER_TIER && minCountFinal < n - 1) {
+                            successfulPlan = {
+                                n,
+                                targets: jitteredTargets,
+                                prices,
+                                finalTokens: tokens,
+                                percents: finalPercents
+                            };
+                            break;
+                        }
+                    }
+                } // end trials per n
+
+                if (successfulPlan) break;
+            } // end n loop
+
+            if (!successfulPlan) {
+                // Could not meet target using randomized 5..10 tiers
+                const proceed = confirm('The target USD cannot be met with a minimum of 5–10 tiers (with 10% per tier minimum) under the current constraints. Would you like to try a suggestion with 3 or 4 tiers? Click OK to try 3 tiers, Cancel to abort.');
+                if (proceed) {
+                    const tried = tryLowerTierSuggestion([3,4], initialKendu, parseNumericInput(document.getElementById('auto-target-usd').value || ''), parseNumericInput(document.getElementById('auto-max-mcap').value || ''), alternative);
+                    if (!tried) {
+                        alert('Even with a 3- or 4-tier plan we could not meet the target under the constraints. Consider adjusting target or max market cap.');
+                    }
+                } else {
+                    alert('Auto-generation aborted. You can adjust inputs and try again.');
+                }
+                return;
+            }
+
+            // Apply successful plan to UI
+            applyGeneratedPlanToUI(successfulPlan, initialKendu);
+        }
+
+        function tryLowerTierSuggestion(candidates, initialKendu, targetUsd, maxMcapNum, alternative=false) {
+            // Similar randomized approach but with smaller n set (3 or 4)
+            for (const n of candidates) {
+                const baseTargets = buildTierTargetsLinear(maxMcapNum, MARKET_CAP_USD || 0, n, alternative);
+                if (!baseTargets || baseTargets.length !== n) continue;
+
+                for (let trial = 0; trial < RANDOM_TRIALS_PER_N; trial++) {
+                    const percents = generateRandomPercentages(n);
+                    const tokensPerTier = percents.map(p => (p / 100) * initialKendu);
+                    const jitteredTargets = jitterTargets(baseTargets, 0.3, alternative);
+                    jitteredTargets[jitteredTargets.length - 1] = Math.min(jitteredTargets[jitteredTargets.length - 1], maxMcapNum);
+                    const prices = jitteredTargets.map(t => t / KENDU_CIRCULATING_SUPPLY);
+                    let realizedUsd = tokensPerTier.reduce((s,t,i)=>s + t * prices[i], 0);
+
+                    if (realizedUsd + 1e-6 >= targetUsd) {
+                        const finalPercents = tokensPerTier.map(t => (t / initialKendu) * 100);
+                        if (Math.max(...finalPercents) <= MAX_PERCENT_PER_TIER) {
+                            applyGeneratedPlanToUI({ n, targets: jitteredTargets, prices, finalTokens: tokensPerTier, percents: finalPercents }, initialKendu);
+                            return true;
+                        }
+                    }
+
+                    // top-up greedy
+                    let tokens = tokensPerTier.slice();
+                    const indicesByPriceDesc = prices.map((p,i)=>({p,i})).sort((a,b)=>b.p - a.p).map(x=>x.i);
+                    let tokensLeftTotal = Math.max(0, initialKendu - tokens.reduce((s,x)=>s+x,0));
+                    let currentRealized = realizedUsd;
+                    for (const idx of indicesByPriceDesc) {
+                        if (tokensLeftTotal <= 0) break;
+                        const currentPct = (tokens[idx] / initialKendu) * 100;
+                        const availablePct = Math.max(0, MAX_PERCENT_PER_TIER - currentPct);
+                        const availableTokens = (availablePct / 100) * initialKendu;
+                        const allocate = Math.min(availableTokens, tokensLeftTotal);
+                        tokens[idx] += allocate;
+                        tokensLeftTotal -= allocate;
+                        currentRealized += allocate * prices[idx];
+                        if (currentRealized + 1e-6 >= targetUsd) break;
+                    }
+                    if (currentRealized + 1e-6 >= targetUsd) {
+                        const finalPercents = tokens.map(t => (t / initialKendu) * 100);
+                        if (Math.max(...finalPercents) <= MAX_PERCENT_PER_TIER) {
+                            applyGeneratedPlanToUI({ n, targets: jitteredTargets, prices, finalTokens: tokens, percents: finalPercents }, initialKendu);
+                            return true;
+                        }
+                    }
+                }
+            }
+            return false;
+        }
+
+        function applyGeneratedPlanToUI(plan, initialKendu) {
+            // clear existing and build rows
+            clearAllTiers();
+            const n = plan.n;
+            const targets = plan.targets;
+            const finalTokens = plan.finalTokens;
+            const percents = plan.percents || finalTokens.map(t => (t / initialKendu) * 100);
+
+            // convert tokens to percentage strings (and token amounts) for inputs
+            for (let i = 0; i < n; i++) {
+                const targetField = formatMcapInputForField(targets[i]);
+                // compute percent of initial stack
+                const percent = percents[i] || ((finalTokens[i] / initialKendu) * 100);
+                // ensure at least MIN_PERCENT_PER_TIER
+                const percentClamped = Math.max(MIN_PERCENT_PER_TIER, percent);
+                // NEW: show both percentage and compact token quantity (e.g., "12.5% (125M)")
+                const tokenCompact = formatTokens(finalTokens[i]);
+                const sellValueString = `${percentClamped.toFixed(1)}% (${tokenCompact})`;
+                addSellTier(targetField, sellValueString);
+            }
+            recalculateAll();
+            alert(`Auto-generated a ${n}-tier plan. You can still manually edit any tier values. Use "Copy table (CSV)" to paste into Excel.`);
+        }
+
+        // --- Copy CSV export ---
+        function copyTableCSV() {
+            const rows = [];
+            const tierRows = document.querySelectorAll('.sell-tier-row');
+            rows.push(['Target MCap', 'Sell Amount (raw input)', 'Target Price (USD)', 'Tokens To Sell (approx)', 'USD Realized (approx)']);
+            const initialKendu = parseInputWithSuffixes(document.getElementById('kendu-amount').value || '');
+            tierRows.forEach(row => {
+                const tcap = row.querySelector('.target-cap-input').value || '';
+                const sellAmtRaw = row.querySelector('.sell-amount-input').value || '';
+                const targetPrice = row.querySelector('.tier-target-price').textContent || '';
+                const tokensToSell = row.querySelector('.tier-kendu-to-sell').textContent || '';
+                const usdRealized = row.querySelector('.tier-usd-realized').textContent || '';
+                rows.push([tcap, sellAmtRaw, targetPrice, tokensToSell, usdRealized]);
+            });
+            // build CSV
+            const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+            // copy to clipboard
+            navigator.clipboard.writeText(csv).then(() => {
+                alert('Table CSV copied to clipboard. Paste into Excel/Sheets.');
+            }).catch(() => {
+                // fallback: place in temporary textarea
+                const ta = document.createElement('textarea');
+                ta.value = csv;
+                document.body.appendChild(ta);
+                ta.select();
+                try {
+                    document.execCommand('copy');
+                    alert('Table CSV copied to clipboard (fallback).');
+                } catch (e) {
+                    alert('Unable to copy automatically. Please paste and copy from the created field below.');
+                }
+                ta.remove();
+            });
+        }
+
+        // --- end auto-generate logic --- //
+
+        function initializeDisplay() {
+            const formattedSupply = new Intl.NumberFormat('en-US', {
+                maximumFractionDigits: 2
+            }).format(KENDU_CIRCULATING_SUPPLY / 1e9) + ' Billion';
+            document.getElementById('circulating-supply-display').textContent = formattedSupply;
+
+            addSellTier();
+            fetchKenduPrice();
+            setInterval(fetchKenduPrice, POLLING_INTERVAL);
+        }
+
+        window.recalculateAll = recalculateAll;
+        window.addSellTier = addSellTier;
+        window.removeSellTier = removeSellTier;
+        window.formatSellAmount = formatSellAmount;
+        window.handleInput = handleInput;
+        window.normalizeTargetMcapOnBlur = normalizeTargetMcapOnBlur;
+        window.normalizeTargetTokensOnBlur = normalizeTargetTokensOnBlur;
+        window.autoGenerateStrategy = autoGenerateStrategy;
+        window.autoGenerateStrategy = autoGenerateStrategy; // alias used by buttons (alt param)
+        window.autoGenerate = autoGenerateStrategy;
+
+        window.onload = initializeDisplay;
+
+    </script>
+</body>
+</html>
